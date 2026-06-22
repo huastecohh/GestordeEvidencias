@@ -1,0 +1,37 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Clipboard Body (Academic Blue) -->
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M25,20 H75 A5,5 0 0 1 80,25 V85 A5,5 0 0 1 75,90 H25 A5,5 0 0 1 20,85 V25 A5,5 0 0 1 25,20 Z" />
+
+    <!-- Clipboard Top Clip -->
+    <path
+        android:fillColor="#3F51B5"
+        android:pathData="M40,15 H60 A2,2 0 0 1 62,17 V22 H38 V17 A2,2 0 0 1 40,15 Z" />
+
+    <!-- Camera Lens in the middle (Secondary Amber) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M50,55 m-15,0 a15,15 0 1,1 30,0 a15,15 0 1,1 -30,0" />
+
+    <!-- Lens Inner Detail -->
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M50,55 m-8,0 a8,8 0 1,1 16,0 a8,8 0 1,1 -16,0" />
+
+    <!-- Flash/Sparkle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,47 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+
+    <!-- Text Lines (Minimalist) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.3"
+        android:pathData="M30,35 H70 V38 H30 Z M30,75 H60 V78 H30 Z" />
+</vector>
