@@ -1,69 +1,86 @@
 package com.example.gestordeevidencias.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AcademicBlue80,
-    secondary = AcademicBlueGrey80,
-    tertiary = SecondaryAmber80,
-    background = Color(0xFF121212),
-    surface = Color(0xFF121212)
+private val LightColorScheme = lightColorScheme(
+    primary          = Indigo600,
+    onPrimary        = Color.White,
+    primaryContainer = Indigo50,
+    onPrimaryContainer = Indigo900,
+
+    secondary        = Teal600,
+    onSecondary      = Color.White,
+    secondaryContainer = Teal50,
+    onSecondaryContainer = Teal700,
+
+    tertiary         = Amber600,
+    onTertiary       = Color.White,
+    tertiaryContainer = Amber50,
+    onTertiaryContainer = Amber700,
+
+    error            = Rose600,
+    errorContainer   = Rose50,
+
+    background       = Surface1,
+    onBackground     = Ink900,
+    surface          = Surface0,
+    onSurface        = Ink900,
+    surfaceVariant   = Surface2,
+    onSurfaceVariant = Ink700,
+    outline          = Ink200,
+    outlineVariant   = Color(0x1F3D52A0),  // Indigo600 @ 12% alpha
+
+    inversePrimary   = Indigo400,
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = AcademicBlue,
-    secondary = AcademicBlueLight,
-    tertiary = SecondaryAmber,
-    background = BackgroundLight,
-    surface = SurfaceLight,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
+private val DarkColorScheme = darkColorScheme(
+    primary          = Indigo400,
+    onPrimary        = Indigo900,
+    primaryContainer = Color(0xFF2A3670),
+    onPrimaryContainer = Indigo100,
+
+    secondary        = Teal600,
+    onSecondary      = Color.White,
+    secondaryContainer = Color(0xFF0D3D2E),
+    onSecondaryContainer = Teal50,
+
+    background       = DarkSurface1,
+    onBackground     = DarkInk900,
+    surface          = DarkSurface0,
+    onSurface        = DarkInk900,
+    surfaceVariant   = DarkSurface2,
+    onSurfaceVariant = DarkInk700,
+    outline          = Color(0x33FFFFFF),
 )
 
 @Composable
 fun GestorDeEvidenciasTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // Disabled to force our academic style
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
-        content = content
+        typography  = AppTypography,
+        shapes      = AppShapes,
+        content     = content
     )
 }

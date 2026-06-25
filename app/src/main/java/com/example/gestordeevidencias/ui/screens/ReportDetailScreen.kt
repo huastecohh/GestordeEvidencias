@@ -4,40 +4,37 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
-import com.example.gestordeevidencias.R
 import com.example.gestordeevidencias.data.local.entities.EvidenceEntity
 import com.example.gestordeevidencias.data.local.entities.ReportEntity
+import com.example.gestordeevidencias.ui.components.EvidenceListItem
+import com.example.gestordeevidencias.ui.components.PdfPreviewDialog
 import com.example.gestordeevidencias.ui.viewmodel.ReportViewModel
-import com.example.gestordeevidencias.util.WordExportHelper
 import com.example.gestordeevidencias.util.PdfExportHelper
+import com.example.gestordeevidencias.util.ShareHelper
+import com.example.gestordeevidencias.util.WordExportHelper
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,11 +49,14 @@ fun ReportDetailScreen(
     val context = LocalContext.current
     val evidencesList by viewModel.getEvidences(report.id).collectAsState(initial = emptyList())
     
-    var evidences by remember(evidencesList) { mutableStateOf(evidencesList) }
+    // Internal state for reordering
+    var listForReorder by remember(evidencesList) { mutableStateOf(evidencesList) }
+    
     var selectedEvidence by remember { mutableStateOf<EvidenceEntity?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showExportMenu by remember { mutableStateOf(false) }
     var showAddMenu by remember { mutableStateOf(false) }
+    var showPdfPreview by remember { mutableStateOf(false) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -65,13 +65,24 @@ fun ReportDetailScreen(
         }
     )
 
+    val lazyListState = rememberLazyListState()
+    val reorderState = rememberReorderableLazyListState(
+        lazyListState = lazyListState,
+        onMove = { from, to ->
+            listForReorder = listForReorder.toMutableList().apply {
+                add(to.index, removeAt(from.index))
+            }
+            updateOrderInDb(viewModel, listForReorder)
+        }
+    )
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(report.subject, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(report.studentName, style = MaterialTheme.typography.bodySmall)
+                        Text(report.subject, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(report.studentName, style = MaterialTheme.typography.labelSmall)
                     }
                 },
                 navigationIcon = {
@@ -92,16 +103,15 @@ fun ReportDetailScreen(
                                 text = { Text("Exportar a Word (.docx)") },
                                 onClick = {
                                     showExportMenu = false
-                                    val file = WordExportHelper.exportToWord(context, report, evidences)
-                                    if (file != null) shareFile(context, file, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                                    val file = WordExportHelper.exportToWord(context, report, evidencesList)
+                                    if (file != null) ShareHelper.shareFile(context, file, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                                 }
                             )
                             DropdownMenuItem(
                                 text = { Text("Exportar a PDF (.pdf)") },
                                 onClick = {
                                     showExportMenu = false
-                                    val file = PdfExportHelper.exportToPdf(context, report, evidences)
-                                    if (file != null) shareFile(context, file, "application/pdf")
+                                    showPdfPreview = true
                                 }
                             )
                         }
@@ -120,7 +130,7 @@ fun ReportDetailScreen(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         modifier = Modifier.padding(bottom = 8.dp)
                     ) {
-                        Icon(Icons.Default.List, "Galería")
+                        Icon(Icons.Default.Image, "Galería")
                     }
                     SmallFloatingActionButton(
                         onClick = {
@@ -130,7 +140,7 @@ fun ReportDetailScreen(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         modifier = Modifier.padding(bottom = 8.dp)
                     ) {
-                        Icon(Icons.Default.Create, "Cámara")
+                        Icon(Icons.Default.PhotoCamera, "Cámara")
                     }
                 }
                 FloatingActionButton(
@@ -138,7 +148,7 @@ fun ReportDetailScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Añadir")
+                    Icon(if (showAddMenu) Icons.Default.Close else Icons.Default.Add, contentDescription = "Añadir")
                 }
             }
         }
@@ -149,52 +159,70 @@ fun ReportDetailScreen(
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            InfoSection(report)
+            InfoSectionPremium(report)
             
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
             
-            if (evidences.isEmpty()) {
-                EmptyEvidenceState()
+            if (evidencesList.isEmpty()) {
+                EmptyEvidenceStatePremium()
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsIndexed(evidences) { index, evidence ->
-                        StyledEvidenceItem(
-                            evidence = evidence,
-                            onEdit = {
-                                selectedEvidence = it
-                                showEditDialog = true
-                            },
-                            onMoveUp = if (index > 0) {
-                                {
-                                    val newList = evidences.toMutableList()
-                                    val item = newList.removeAt(index)
-                                    newList.add(index - 1, item)
-                                    evidences = newList
-                                    updateOrderInDb(viewModel, newList)
+                    itemsIndexed(listForReorder, key = { _, item -> item.id }) { index, evidence ->
+                        ReorderableItem(reorderState, key = evidence.id) { isDragging ->
+                            EvidenceListItem(
+                                evidence = evidence,
+                                index = index,
+                                isDragging = isDragging,
+                                onClick = {
+                                    selectedEvidence = evidence
+                                    showEditDialog = true
+                                },
+                                dragHandle = {
+                                    IconButton(
+                                        modifier = Modifier.draggableHandle(),
+                                        onClick = {}
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.DragHandle,
+                                            contentDescription = "Reordenar",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
-                            } else null,
-                            onMoveDown = if (index < evidences.size - 1) {
-                                {
-                                    val newList = evidences.toMutableList()
-                                    val item = newList.removeAt(index)
-                                    newList.add(index + 1, item)
-                                    evidences = newList
-                                    updateOrderInDb(viewModel, newList)
-                                }
-                            } else null
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
+    if (showPdfPreview) {
+        PdfPreviewDialog(
+            report = report,
+            evidences = evidencesList,
+            onDismiss = { showPdfPreview = false },
+            onConfirm = {
+                val file = PdfExportHelper.exportToPdf(context, report, evidencesList)
+                if (file != null) ShareHelper.shareFile(context, file, "application/pdf")
+                showPdfPreview = false
+            },
+            onRotateImage = { evidence ->
+                viewModel.updateEvidence(evidence.copy(rotation = (evidence.rotation + 90f) % 360f))
+            },
+            onScaleImage = { evidence, newScale ->
+                viewModel.updateEvidence(evidence.copy(scale = newScale))
+            }
+        )
+    }
+
     if (showEditDialog && selectedEvidence != null) {
-        EditEvidenceDialog(
+        EditEvidenceDialogPremium(
             selectedEvidence!!,
             onDismiss = { showEditDialog = false },
             onSave = { label, desc ->
@@ -210,113 +238,45 @@ fun ReportDetailScreen(
 }
 
 @Composable
-fun InfoSection(report: ReportEntity) {
+fun InfoSectionPremium(report: ReportEntity) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        SuggestionChip(
+        AssistChip(
             onClick = { },
             label = { Text("Grado: ${report.grade}°") },
-            colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            leadingIcon = { Icon(Icons.Default.School, null, Modifier.size(16.dp)) }
         )
-        SuggestionChip(
+        AssistChip(
             onClick = { },
             label = { Text("Grupo: ${report.group}") },
-            colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        )
-        SuggestionChip(
-            onClick = { },
-            label = { Text("ID: #${report.id}") }
+            leadingIcon = { Icon(Icons.Default.Group, null, Modifier.size(16.dp)) }
         )
     }
 }
 
 @Composable
-fun StyledEvidenceItem(
-    evidence: EvidenceEntity,
-    onEdit: (EvidenceEntity) -> Unit,
-    onMoveUp: (() -> Unit)?,
-    onMoveDown: (() -> Unit)?
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onEdit(evidence) },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column {
-            Box {
-                AsyncImage(
-                    model = evidence.imagePath,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentScale = ContentScale.Crop
-                )
-                
-                // Overlay para ordenamiento
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                ) {
-                    if (onMoveUp != null) {
-                        IconButton(onClick = onMoveUp) {
-                            Icon(Icons.Default.KeyboardArrowUp, null, tint = Color.White)
-                        }
-                    }
-                    if (onMoveDown != null) {
-                        IconButton(onClick = onMoveDown) {
-                            Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White)
-                        }
-                    }
-                }
-            }
-            
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = evidence.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                if (evidence.description.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = evidence.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyEvidenceState() {
+fun EmptyEvidenceStatePremium() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_app_logo),
+                imageVector = Icons.Default.PhotoLibrary,
                 contentDescription = null,
-                modifier = Modifier.size(80.dp).padding(bottom = 16.dp),
-                tint = Color.Unspecified
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
             )
-            Text("Aún no hay fotos", style = MaterialTheme.typography.bodyLarge)
-            Text("Pulsa + para capturar una evidencia", style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(16.dp))
+            Text("Aún no hay evidencias", style = MaterialTheme.typography.titleMedium)
+            Text("Usa el botón + para empezar", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 @Composable
-fun EditEvidenceDialog(
+fun EditEvidenceDialogPremium(
     evidence: EvidenceEntity,
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
@@ -327,13 +287,13 @@ fun EditEvidenceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Detalles de Evidencia") },
+        title = { Text("Detalles de Evidencia", style = MaterialTheme.typography.titleLarge) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = newLabel,
                     onValueChange = { newLabel = it },
-                    label = { Text("Título de la foto") },
+                    label = { Text("Título") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
@@ -347,15 +307,18 @@ fun EditEvidenceDialog(
                 Button(
                     onClick = onAnnotate,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    shape = MaterialTheme.shapes.small
                 ) {
-                    Text("✏️ Dibujar sobre la imagen")
+                    Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Dibujar sobre la imagen")
                 }
             }
         },
         confirmButton = {
             Button(onClick = { onSave(newLabel, newDescription) }) {
-                Text("Guardar Cambios")
+                Text("Guardar")
             }
         },
         dismissButton = {
@@ -369,25 +332,5 @@ fun EditEvidenceDialog(
 private fun updateOrderInDb(viewModel: ReportViewModel, list: List<EvidenceEntity>) {
     list.forEachIndexed { index, evidence ->
         viewModel.updateEvidence(evidence.copy(orderIndex = index))
-    }
-}
-
-private fun shareFile(context: android.content.Context, file: File, mimeType: String) {
-    val uri = FileProvider.getUriForFile(
-        context,
-        "com.example.gestordeevidencias.fileprovider",
-        file
-    )
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = mimeType
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        setPackage("com.whatsapp")
-    }
-    try {
-        context.startActivity(Intent.createChooser(intent, "Compartir reporte"))
-    } catch (e: Exception) {
-        intent.setPackage(null)
-        context.startActivity(Intent.createChooser(intent, "Compartir reporte"))
     }
 }
