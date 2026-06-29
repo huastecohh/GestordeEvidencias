@@ -1,7 +1,9 @@
 package com.example.gestordeevidencias.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,6 +12,8 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +36,18 @@ fun CameraScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    
+    // Forzar orientación horizontal
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -103,25 +119,48 @@ private fun CameraView(
             modifier = Modifier.fillMaxSize()
         )
 
-        Button(
+        // Botón de captura a la derecha (estilo cámara tradicional en landscape)
+        IconButton(
             onClick = {
                 takePhoto(context, imageCapture, cameraExecutor) { uri ->
                     onPhotoCaptured(uri.toString())
                 }
             },
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(32.dp)
+                .align(Alignment.CenterEnd)
+                .padding(end = 48.dp)
+                .size(72.dp)
         ) {
-            Text("Capturar Foto")
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color.White.copy(alpha = 0.5f),
+                border = androidx.compose.foundation.BorderStroke(4.dp, Color.White),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = Color.White,
+                        modifier = Modifier.size(56.dp)
+                    ) {}
+                }
+            }
         }
         
         IconButton(
             onClick = onBack,
             modifier = Modifier.padding(16.dp).align(Alignment.TopStart)
         ) {
-            Text("X", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White, modifier = Modifier.size(32.dp))
         }
+        
+        // Indicador visual de modo horizontal
+        Text(
+            "Modo Horizontal Activado",
+            color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)
+        )
     }
     
     DisposableEffect(Unit) {

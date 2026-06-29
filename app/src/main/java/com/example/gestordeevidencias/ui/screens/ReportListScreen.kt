@@ -100,11 +100,18 @@ fun ReportListContent(
             Column(modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer)) {
                 LargeTopAppBar(
                     title = { 
-                        Text(
-                            "Mis Reportes",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) 
+                        Column {
+                            Text(
+                                text = "Desarrollado por Mtro. Salvador Perez Zamoran",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                "Mis Reportes",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) 
+                        }
                     },
                     colors = TopAppBarDefaults.largeTopAppBarColors(
                         containerColor = Color.Transparent

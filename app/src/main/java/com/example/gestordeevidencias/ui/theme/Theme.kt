@@ -11,54 +11,54 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary          = Indigo600,
-    onPrimary        = Color.White,
-    primaryContainer = Indigo50,
-    onPrimaryContainer = Indigo900,
+    primary = LightBluePrimary,
+    onPrimary = Color.White,
+    primaryContainer = LightBlueSecondary,
+    onPrimaryContainer = LightBlueDark,
 
-    secondary        = Teal600,
-    onSecondary      = Color.White,
-    secondaryContainer = Teal50,
-    onSecondaryContainer = Teal700,
+    secondary = AcademicGray,
+    onSecondary = Color.White,
+    secondaryContainer = AcademicGrayLight,
+    onSecondaryContainer = AcademicGrayDark,
 
-    tertiary         = Amber600,
-    onTertiary       = Color.White,
-    tertiaryContainer = Amber50,
-    onTertiaryContainer = Amber700,
+    tertiary = LightBlueSecondary,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFEF3E2),
+    onTertiaryContainer = Color(0xFFA85C00),
 
-    error            = Rose600,
-    errorContainer   = Rose50,
+    error = ErrorRed,
+    errorContainer = Color(0xFFFCEEF2),
 
-    background       = Surface1,
-    onBackground     = Ink900,
-    surface          = Surface0,
-    onSurface        = Ink900,
-    surfaceVariant   = Surface2,
-    onSurfaceVariant = Ink700,
-    outline          = Ink200,
-    outlineVariant   = Color(0x1F3D52A0),  // Indigo600 @ 12% alpha
+    background = BackgroundLight,
+    onBackground = TextPrimary,
+    surface = SurfaceLight,
+    onSurface = TextPrimary,
+    surfaceVariant = Color(0xFFECEEF8),
+    onSurfaceVariant = TextSecondary,
+    outline = Color(0xFFCBCEDF),
+    outlineVariant = Color(0x1F03A9F4),
 
-    inversePrimary   = Indigo400,
+    inversePrimary = LightBlue80,
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary          = Indigo400,
-    onPrimary        = Indigo900,
+    primary = LightBlue80,
+    onPrimary = Color(0xFF003544),
     primaryContainer = Color(0xFF2A3670),
-    onPrimaryContainer = Indigo100,
+    onPrimaryContainer = LightBlueSecondary,
 
-    secondary        = Teal600,
-    onSecondary      = Color.White,
+    secondary = AcademicGray80,
+    onSecondary = Color.White,
     secondaryContainer = Color(0xFF0D3D2E),
-    onSecondaryContainer = Teal50,
+    onSecondaryContainer = Color(0xFFE6F4F0),
 
-    background       = DarkSurface1,
-    onBackground     = DarkInk900,
-    surface          = DarkSurface0,
-    onSurface        = DarkInk900,
-    surfaceVariant   = DarkSurface2,
-    onSurfaceVariant = DarkInk700,
-    outline          = Color(0x33FFFFFF),
+    background = Color(0xFF1A1C1E),
+    onBackground = Color(0xFFE2E2E6),
+    surface = Color(0xFF1A1C1E),
+    onSurface = Color(0xFFE2E2E6),
+    surfaceVariant = Color(0xFF232638),
+    onSurfaceVariant = Color(0xFFB0B5D4),
+    outline = Color(0x33FFFFFF),
 )
 
 @Composable
