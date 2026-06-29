@@ -26,5 +26,7 @@ data class EvidenceEntity(
     val imagePath: String,
     val label: String,
     val description: String = "",
-    val orderIndex: Int
+    val orderIndex: Int,
+    val rotation: Float = 0f,
+    val scale: Float = 1.0f
 ) : Parcelable

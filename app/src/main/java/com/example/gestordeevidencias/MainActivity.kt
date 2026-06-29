@@ -2,6 +2,7 @@ package com.example.gestordeevidencias
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -31,6 +32,15 @@ class MainActivity : ComponentActivity() {
                 var selectedReport by rememberSaveable { mutableStateOf<ReportEntity?>(null) }
                 var selectedEvidence by rememberSaveable { mutableStateOf<EvidenceEntity?>(null) }
 
+                BackHandler(enabled = currentScreen != "list") {
+                    when (currentScreen) {
+                        "create" -> currentScreen = "list"
+                        "detail" -> currentScreen = "list"
+                        "camera" -> currentScreen = "detail"
+                        "annotation" -> currentScreen = "detail"
+                    }
+                }
+
                 AnimatedContent(
                     targetState = currentScreen,
                     transitionSpec = {
@@ -58,6 +68,7 @@ class MainActivity : ComponentActivity() {
                         "create" -> {
                             CreateReportScreen(
                                 viewModel = viewModel,
+                                onBack = { currentScreen = "list" },
                                 onReportCreated = { currentScreen = "list" }
                             )
                         }

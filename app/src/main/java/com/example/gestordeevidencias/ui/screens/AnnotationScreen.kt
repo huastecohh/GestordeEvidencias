@@ -5,6 +5,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.net.Uri
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -13,7 +17,10 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +38,8 @@ import com.example.gestordeevidencias.data.local.entities.EvidenceEntity
 import java.io.File
 import java.io.FileOutputStream
 
+enum class AnnotationTool { PENCIL, MOVE, ZOOM, UNDO }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnnotationScreen(
@@ -38,6 +48,7 @@ fun AnnotationScreen(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
+    var activeTool by remember { mutableStateOf(AnnotationTool.PENCIL) }
     
     // Carga de la imagen original
     val bitmap = remember {
@@ -62,23 +73,31 @@ fun AnnotationScreen(
     // Estados de transformación (Zoom y Pan)
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var isDrawMode by remember { mutableStateOf(true) } // Alternar entre dibujar y mover
     var triggerRedraw by remember { mutableStateOf(0) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
     val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        if (!isDrawMode) {
-            scale *= zoomChange
-            offset += offsetChange
+        if (activeTool == AnnotationTool.MOVE || activeTool == AnnotationTool.ZOOM) {
+            if (activeTool == AnnotationTool.ZOOM) scale *= zoomChange
+            if (activeTool == AnnotationTool.MOVE) offset += offsetChange
         }
     }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color(0xFF12151F),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Anotar Evidencia") },
+            TopAppBar(
+                title = {
+                    Text(
+                        "Anotar evidencia",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onCancel) { Icon(Icons.Default.Close, null) }
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Default.Close, null, tint = androidx.compose.ui.graphics.Color.White.copy(0.6f))
+                    }
                 },
                 actions = {
                     IconButton(onClick = {
@@ -88,72 +107,31 @@ fun AnnotationScreen(
                         out.close()
                         onSave("file://" + file.absolutePath)
                     }) {
-                        Icon(Icons.Default.Check, null)
+                        Icon(Icons.Default.Check, null, tint = androidx.compose.ui.graphics.Color.White)
                     }
-                }
-            )
-        },
-        bottomBar = {
-            BottomAppBar(
-                actions = {
-                    IconButton(
-                        onClick = { isDrawMode = true },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isDrawMode) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    ) {
-                        Icon(Icons.Default.Edit, "Modo Dibujo")
-                    }
-                    IconButton(
-                        onClick = { isDrawMode = false },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (!isDrawMode) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    ) {
-                        Icon(Icons.Default.Menu, "Modo Mover/Zoom")
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = { 
-                        scale = 1f
-                        offset = Offset.Zero
-                    }) {
-                        Text("Reset Vista")
-                    }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color(0xFF1A1D2B)
+                )
             )
         }
-    ) { paddingValues ->
+    ) { padding ->
         Box(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                .padding(padding)
                 .background(androidx.compose.ui.graphics.Color.Black)
                 .onSizeChanged { canvasSize = it }
                 .transformable(state = transformState)
-                .pointerInput(isDrawMode, scale, offset, canvasSize) {
-                    if (isDrawMode) {
+                .pointerInput(activeTool, scale, offset, canvasSize) {
+                    if (activeTool == AnnotationTool.PENCIL) {
                         detectDragGestures { change, dragAmount ->
                             change.consume()
-                            
-                            // Cálculo de coordenadas relativas al bitmap
-                            // 1. Ajustar por el offset y escala de la UI
-                            // 2. Mapear del tamaño del Canvas de Compose al tamaño real del Bitmap
                             
                             val imgWidth = canvasBitmap.width.toFloat()
                             val imgHeight = canvasBitmap.height.toFloat()
                             
-                            // Factor de escala intrínseco (cómo encaja el bitmap en el componente)
-                            val factorX = imgWidth / canvasSize.width
-                            val factorY = imgHeight / canvasSize.height
-                            val fitScale = minOf(1/factorX, 1/factorY) * canvasSize.width / imgWidth
-                            
                             fun screenToBitmap(pos: Offset): Offset {
-                                val centeredOffset = Offset(
-                                    (canvasSize.width - imgWidth * scale * (1/factorX)) / 2,
-                                    (canvasSize.height - imgHeight * scale * (1/factorY)) / 2
-                                )
-                                // Simplificación: Usamos una transformación directa para el MVP
-                                // Para precisión quirúrgica se requiere una matriz de transformación inversa
                                 return Offset(
                                     (pos.x - offset.x) * (imgWidth / (canvasSize.width * scale)),
                                     (pos.y - offset.y) * (imgHeight / (canvasSize.height * scale))
@@ -186,21 +164,84 @@ fun AnnotationScreen(
                     )
                 }
             }
+
+            // Barra flotante LATERAL DERECHA
+            FloatingAnnotationToolbarPremium(
+                activeTool = activeTool,
+                onToolSelected = { 
+                    if (it == AnnotationTool.UNDO) {
+                        // Implement undo logic if needed
+                    } else {
+                        activeTool = it
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun FloatingAnnotationToolbarPremium(
+    activeTool: AnnotationTool,
+    onToolSelected: (AnnotationTool) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = androidx.compose.ui.graphics.Color(0xFF0F1120).copy(alpha = 0.88f),
+        border = BorderStroke(0.5.dp, androidx.compose.ui.graphics.Color.White.copy(0.1f)),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ToolButtonPremium(icon = Icons.Outlined.Edit, tool = AnnotationTool.PENCIL, active = activeTool, onSelect = onToolSelected)
             
-            if (!isDrawMode) {
-                Surface(
-                    modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
-                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        "Usa dos dedos para Zoom o arrastra para mover",
-                        color = androidx.compose.ui.graphics.Color.White,
-                        modifier = Modifier.padding(8.dp),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
+            HorizontalDivider(modifier = Modifier.width(24.dp).padding(vertical = 2.dp), color = androidx.compose.ui.graphics.Color.White.copy(0.1f))
+
+            ToolButtonPremium(icon = Icons.Outlined.PanTool, tool = AnnotationTool.MOVE, active = activeTool, onSelect = onToolSelected)
+            ToolButtonPremium(icon = Icons.Outlined.ZoomIn, tool = AnnotationTool.ZOOM, active = activeTool, onSelect = onToolSelected)
+
+            HorizontalDivider(modifier = Modifier.width(24.dp).padding(vertical = 2.dp), color = androidx.compose.ui.graphics.Color.White.copy(0.1f))
+
+            ToolButtonPremium(icon = Icons.AutoMirrored.Outlined.Undo, tool = AnnotationTool.UNDO, active = activeTool, onSelect = onToolSelected, tint = androidx.compose.ui.graphics.Color(0xFFFF6B6B))
+        }
+    }
+}
+
+@Composable
+private fun ToolButtonPremium(
+    icon: ImageVector,
+    tool: AnnotationTool,
+    active: AnnotationTool,
+    onSelect: (AnnotationTool) -> Unit,
+    tint: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White
+) {
+    val isActive = tool == active
+    val bgColor by animateColorAsState(
+        targetValue = if (isActive) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = tween(150),
+        label = "toolBg"
+    )
+    Surface(
+        onClick = { onSelect(tool) },
+        modifier = Modifier.size(36.dp),
+        shape = MaterialTheme.shapes.small,
+        color = bgColor
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = tool.name,
+                modifier = Modifier.size(18.dp),
+                tint = if (isActive) androidx.compose.ui.graphics.Color.White else tint.copy(alpha = 0.6f)
+            )
         }
     }
 }

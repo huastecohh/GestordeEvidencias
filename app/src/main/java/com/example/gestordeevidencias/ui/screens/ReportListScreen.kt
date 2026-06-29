@@ -4,30 +4,32 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.gestordeevidencias.R
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.example.gestordeevidencias.data.local.entities.ReportEntity
+import com.example.gestordeevidencias.ui.components.PdfPreviewDialog
+import com.example.gestordeevidencias.ui.components.ReportCard
+import com.example.gestordeevidencias.ui.theme.GestorDeEvidenciasTheme
 import com.example.gestordeevidencias.ui.viewmodel.ReportViewModel
+import com.example.gestordeevidencias.util.PdfExportHelper
+import com.example.gestordeevidencias.util.ShareHelper
+import com.example.gestordeevidencias.util.WordExportHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,21 +41,76 @@ fun ReportListScreen(
     val reports by viewModel.reports.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    var reportForPdfPreview by remember { mutableStateOf<ReportEntity?>(null) }
 
+    if (reportForPdfPreview != null) {
+        val evidences by viewModel.getEvidences(reportForPdfPreview!!.id).collectAsState(initial = emptyList())
+        PdfPreviewDialog(
+            report = reportForPdfPreview!!,
+            evidences = evidences,
+            onDismiss = { reportForPdfPreview = null },
+            onConfirm = {
+                val file = PdfExportHelper.exportToPdf(context, reportForPdfPreview!!, evidences)
+                if (file != null) ShareHelper.shareFile(context, file, "application/pdf")
+                reportForPdfPreview = null
+            },
+            onRotateImage = { evidence ->
+                viewModel.updateEvidence(evidence.copy(rotation = (evidence.rotation + 90f) % 360f))
+            },
+            onScaleImage = { evidence, newScale ->
+                viewModel.updateEvidence(evidence.copy(scale = newScale))
+            }
+        )
+    }
+
+    ReportListContent(
+        reports = reports,
+        searchQuery = searchQuery,
+        onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+        onCreateNewReport = onCreateNewReport,
+        onReportClick = onReportClick,
+        onExportPdf = { report ->
+            reportForPdfPreview = report
+        },
+        onExportWord = { report ->
+            scope.launch {
+                val evidences = viewModel.getEvidences(report.id).first()
+                val file = WordExportHelper.exportToWord(context, report, evidences)
+                if (file != null) ShareHelper.shareFile(context, file, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportListContent(
+    reports: List<ReportEntity>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onCreateNewReport: () -> Unit,
+    onReportClick: (ReportEntity) -> Unit,
+    onExportPdf: (ReportEntity) -> Unit,
+    onExportWord: (ReportEntity) -> Unit
+) {
     Scaffold(
         topBar = {
             Column(modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer)) {
                 LargeTopAppBar(
                     title = { 
-                        Text(
-                            "Mis Reportes",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) 
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.backupData(context) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Copia de seguridad")
+                        Column {
+                            Text(
+                                text = "Desarrollado por Mtro. Salvador Perez Zamoran",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                "Mis Reportes",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) 
                         }
                     },
                     colors = TopAppBarDefaults.largeTopAppBarColors(
@@ -63,7 +120,7 @@ fun ReportListScreen(
                 
                 TextField(
                     value = searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChange(it) },
+                    onValueChange = onSearchQueryChange,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -73,7 +130,9 @@ fun ReportListScreen(
                     colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent
+                        disabledIndicatorColor = Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -82,8 +141,8 @@ fun ReportListScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = onCreateNewReport,
-                containerColor = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.onTertiary,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 icon = { Icon(Icons.Default.Add, "Nuevo") },
                 text = { Text("Crear Reporte") }
             )
@@ -93,7 +152,7 @@ fun ReportListScreen(
             EmptyState(modifier = Modifier.padding(paddingValues))
         } else if (reports.isEmpty() && searchQuery.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("No se encontraron resultados para '$searchQuery'")
+                Text("No se encontraron resultados para '$searchQuery'", style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             LazyColumn(
@@ -102,81 +161,17 @@ fun ReportListScreen(
                     .padding(paddingValues)
                     .background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(reports) { report ->
+                items(items = reports, key = { it.id }) { report ->
                     ReportCard(
                         report = report,
+                        evidenceCount = 0,
                         onClick = { onReportClick(report) },
-                        onDelete = { viewModel.deleteReport(report) }
+                        onExportPdf = { onExportPdf(report) },
+                        onExportWord = { onExportWord(report) }
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun ReportCard(
-    report: ReportEntity,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp)
-            ) {
-                Text(
-                    text = report.subject,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = report.studentName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "${report.grade}° ${report.group}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                )
             }
         }
     }
@@ -198,8 +193,8 @@ fun EmptyState(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 "No hay reportes creados",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Light
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
             )
             Text(
                 "Presiona el botón para comenzar",
@@ -207,5 +202,43 @@ fun EmptyState(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ReportListScreenPreview() {
+    val sampleReports = listOf(
+        ReportEntity(id = 1, subject = "Matemáticas", grade = "1", group = "A", studentName = "Juan Pérez"),
+        ReportEntity(id = 2, subject = "Español", grade = "2", group = "B", studentName = "María García"),
+        ReportEntity(id = 3, subject = "Ciencias", grade = "3", group = "C", studentName = "Carlos López")
+    )
+    
+    GestorDeEvidenciasTheme {
+        ReportListContent(
+            reports = sampleReports,
+            searchQuery = "",
+            onSearchQueryChange = {},
+            onCreateNewReport = {},
+            onReportClick = {},
+            onExportPdf = {},
+            onExportWord = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ReportListScreenEmptyPreview() {
+    GestorDeEvidenciasTheme {
+        ReportListContent(
+            reports = emptyList(),
+            searchQuery = "",
+            onSearchQueryChange = {},
+            onCreateNewReport = {},
+            onReportClick = {},
+            onExportPdf = {},
+            onExportWord = {}
+        )
     }
 }

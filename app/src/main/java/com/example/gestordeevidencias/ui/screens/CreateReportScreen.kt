@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
@@ -22,6 +23,7 @@ import com.example.gestordeevidencias.ui.viewmodel.ReportViewModel
 @Composable
 fun CreateReportScreen(
     viewModel: ReportViewModel,
+    onBack: () -> Unit,
     onReportCreated: () -> Unit
 ) {
     var subject by remember { mutableStateOf("") }
@@ -35,6 +37,11 @@ fun CreateReportScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Nuevo Proyecto", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
